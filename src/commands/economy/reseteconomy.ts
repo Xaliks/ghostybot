@@ -1,5 +1,5 @@
 import { Message } from "discord.js";
-import UserModel, { UserData } from "../../models/User.model";
+import UserModel, { IUser } from "../../models/User.model";
 import Command from "../../structures/Command";
 import Bot from "../../structures/Bot";
 
@@ -18,6 +18,13 @@ export default class ResetEconomyCommand extends Command {
     const lang = await bot.utils.getGuildLang(message.guild?.id);
     try {
       const filter = (m: Message) => message.author.id === m.author.id;
+      const guildId = message.guild?.id;
+      const data = (await UserModel.find({ guild_id: guildId }))
+          .map((v: IUser) => {
+            return { total: v.money + v.bank, ...v };
+          })
+          .sort((a, b) => b.total - a.total)
+          .filter((u) => u.total !== 0)
 
       message.channel.send(lang.ECONOMY.RESET_CONF);
 
@@ -31,12 +38,10 @@ export default class ResetEconomyCommand extends Command {
           const msg = msgs.first();
           if (!msg) return;
           if (["y", "yes"].includes(msg.content.toLowerCase())) {
-            const users: UserData[] = await UserModel.find({ guild_id: message.guild?.id });
-
-            users
-              .filter((u) => u.money !== 0)
-              .forEach((user) => {
-                bot.utils.updateUserById(user.user_id, message.guild?.id, {
+            data
+              .forEach((item, idx) => {
+                const userId = item._doc.user_id;
+                bot.utils.updateUserById(userId, guildId, {
                   money: 0,
                   bank: 0,
                 });
